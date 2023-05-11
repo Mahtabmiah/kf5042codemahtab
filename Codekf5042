@@ -1,0 +1,47 @@
+% Load the credit card data from a CSV file
+data = readtable("creditcard.csv");
+
+% Remove the 'Time' column from the dataset and standardize the 'Amount' column
+data = removevars(data, 'Time');
+data.Amount = zscore(data.Amount);
+
+% Split the data into fraud and non-fraud transactions
+fraud_data = data(data.Class == 1,:);
+nonfraud_data = data(data.Class == 0,:);
+
+% Undersample the non-fraud data to balance the classes
+nonfraud_data = nonfraud_data(randperm(size(nonfraud_data, 1), size(fraud_data, 1)), :);
+balanced_data = [fraud_data; nonfraud_data];
+
+% Split the balanced data into training and testing sets
+cv = cvpartition(size(balanced_data,1),'HoldOut',0.3);
+train_data = balanced_data(cv.training,:);
+test_data = balanced_data(cv.test,:);
+
+% Train a support vector machine (SVM) model on the training data
+svm_model = fitcsvm(train_data(:,1:end-1), train_data.Class);
+
+% Test the SVM model on the testing data
+predicted_labels = predict(svm_model, test_data(:,1:end-1));
+predicted_labels = round(predicted_labels);
+
+% Evaluate the performance of the SVM model using a confusion matrix, accuracy,
+% precision, recall, and area under the precision-recall curve (AUPRC)
+C = confusionmat(test_data.Class, predicted_labels);
+disp('Confusion Matrix:');
+disp(C);
+
+accuracy = sum(diag(C))/sum(C(:));
+precision = C(2,2)/(C(2,2) + C(1,2));
+recall = C(2,2)/(C(2,2) + C(2,1));
+[Xpr,Ypr,Tpr,auprc] = perfcurve(test_data.Class,predicted_labels,'1');
+
+%Display results.
+disp('Accuracy:');
+disp(accuracy);
+disp('Precision:');
+disp(precision);
+disp('Recall:');
+disp(recall);
+disp('Area Under the Precision-Recall Curve (AUPRC):');
+disp(auprc);
